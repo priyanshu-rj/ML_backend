@@ -40,7 +40,7 @@ def load_model():
     if model is None:
         if not os.path.exists(MODEL_PATH):
             print(f"⚠️ ERROR: Model file '{MODEL_PATH}' not found!")
-            return None
+            return None  # Stop execution if the model is missing
         print("✅ Loading model...")
         model = tf.keras.models.load_model(MODEL_PATH)
     return model
@@ -60,13 +60,14 @@ def predict():
         if "file" not in request.files:
             return jsonify({"error": "No file provided"}), 400
 
-        file = request.files["file"].read()
-        if not file:
-            return jsonify({"error": "Empty file"}), 400
+        file = request.files["file"]
 
-        # Read image from file stream
-        file_stream = np.frombuffer(file, np.uint8)
-        image = cv2.imdecode(file_stream, cv2.IMREAD_GRAYSCALE)
+        # Validate MIME type
+        if file.mimetype not in ["image/png", "image/jpeg"]:
+            return jsonify({"error": "Only PNG and JPEG images are supported"}), 400
+
+        file_bytes = np.frombuffer(file.read(), np.uint8)
+        image = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
 
         if image is None:
             return jsonify({"error": "Invalid image format"}), 400
@@ -76,7 +77,7 @@ def predict():
         image = image.reshape(1, 28, 28, 1).astype(np.float32)
 
         # Make prediction
-        predictions = model.predict(image)[0]  # Get predictions for 1 image
+        predictions = model.predict(image)[0]  # Ensure it's a 1D array
 
         # Get top-3 predictions
         top_3_indices = np.argsort(predictions)[-3:][::-1]  # Get highest confidence classes
@@ -95,4 +96,4 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=8080, debug=True)  # Set to port 8080 to match frontend
