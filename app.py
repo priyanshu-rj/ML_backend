@@ -1,62 +1,35 @@
 from flask import Flask, request, jsonify
-import numpy as np
-import cv2
 import tensorflow as tf
-from werkzeug.utils import secure_filename
-import os
+import numpy as np
+from PIL import Image
+import io
 
 app = Flask(__name__)
 
-
-MODEL_PATH = "drawing_model.h5"  
-model = tf.keras.models.load_model(MODEL_PATH)
+model = tf.keras.models.load_model("drawing_model.h5")
 
 
 with open("mini_classes.txt", "r") as f:
-    class_names = [line.strip().replace(" ", "_") for line in f.readlines()]
+    class_names = [c.strip().replace(" ", "_") for c in f.readlines()]
 
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-@app.route('/')
+@app.route("/", methods=["GET"])
 def home():
-    return "ML Model API is Running!"
+    return "ML Model API is running!"
 
-@app.route('/predict', methods=['POST'])
+@app.route("/predict", methods=["POST"])
 def predict():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
 
-    file = request.files['file']
+    file = request.files["file"]
+    img = Image.open(file).convert("L").resize((28, 28))
+    img_array = np.array(img).reshape(1, 28, 28, 1) / 255.0 
+    predictions = model.predict(img_array)[0]
     
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+    top_indices = (-predictions).argsort()[:3]
+    results = [class_names[i] for i in top_indices]
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join("uploads", filename)
+    return jsonify({"predictions": results})
 
-        
-        os.makedirs("uploads", exist_ok=True)
-        file.save(filepath)
-
-       
-        img = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
-        img = cv2.resize(img, (28, 28))  
-        img = img / 255.0  
-        img = np.reshape(img, (1, 28, 28, 1))  
-
-    
-        predictions = model.predict(img)[0]
-        top_indices = np.argsort(-predictions)[:3]  
-        top_classes = [class_names[i] for i in top_indices]
-
-        return jsonify({'predictions': top_classes})
-
-    return jsonify({'error': 'Invalid file type'}), 400
-
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000) 
