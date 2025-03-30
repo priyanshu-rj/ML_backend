@@ -1,35 +1,35 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import tensorflow as tf
 import numpy as np
-from PIL import Image
-import io
+import cv2
 
 app = Flask(__name__)
+CORS(app)
+
 
 model = tf.keras.models.load_model("drawing_model.h5")
 
-
-with open("mini_classes.txt", "r") as f:
-    class_names = [c.strip().replace(" ", "_") for c in f.readlines()]
-
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
-    return "ML Model API is running!"
+    return "ML API is running!"
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+    try:
+        file = request.files["file"].read()
+        image = np.frombuffer(file, np.uint8)
+        image = cv2.imdecode(image, cv2.IMREAD_GRAYSCALE)
+        image = cv2.resize(image, (28, 28)) / 255.0
+        image = image.reshape(1, 28, 28, 1)
 
-    file = request.files["file"]
-    img = Image.open(file).convert("L").resize((28, 28))
-    img_array = np.array(img).reshape(1, 28, 28, 1) / 255.0 
-    predictions = model.predict(img_array)[0]
-    
-    top_indices = (-predictions).argsort()[:3]
-    results = [class_names[i] for i in top_indices]
+        predictions = model.predict(image)
+        class_index = np.argmax(predictions)
 
-    return jsonify({"predictions": results})
+        return jsonify({"predictions": [int(class_index)]})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000) 
+    app.run(host="0.0.0.0", port=10000)
