@@ -1,5 +1,4 @@
 import os
-import gc
 import cv2
 import numpy as np
 import logging
@@ -31,28 +30,33 @@ CLASS_NAMES = [
     "whale", "zebra"
 ]
 
-# Load the trained model once
-MODEL_PATH = "drawing_model.h5"  # Ensure this file is available
+# Model Path
+MODEL_PATH = "drawing_model.h5"
 model = None
 
+# Load the trained model once
 def load_model():
     global model
     if model is None:
-        print("Loading model...")
+        if not os.path.exists(MODEL_PATH):
+            print(f"⚠️ ERROR: Model file '{MODEL_PATH}' not found!")
+            return None
+        print("✅ Loading model...")
         model = tf.keras.models.load_model(MODEL_PATH)
     return model
 
 @app.route("/")
 def home():
-    return "Sketch Recognition API is running!"
+    return "✅ Sketch Recognition API is running!"
 
 @app.route("/predict", methods=["POST"])
 def predict():
     model = load_model()
     if model is None:
-        return jsonify({"error": "Model not loaded properly"}), 500
+        return jsonify({"error": "Model could not be loaded!"}), 500
 
     try:
+        # Check if a file was uploaded
         if "file" not in request.files:
             return jsonify({"error": "No file provided"}), 400
 
@@ -60,36 +64,34 @@ def predict():
         if not file:
             return jsonify({"error": "Empty file"}), 400
 
+        # Read image from file stream
         file_stream = np.frombuffer(file, np.uint8)
         image = cv2.imdecode(file_stream, cv2.IMREAD_GRAYSCALE)
 
         if image is None:
             return jsonify({"error": "Invalid image format"}), 400
 
-        # Preprocess image
+        # Resize and normalize the image
         image = cv2.resize(image, (28, 28)) / 255.0
         image = image.reshape(1, 28, 28, 1).astype(np.float32)
 
         # Make prediction
-        predictions = model.predict(image)
-        class_index = int(np.argmax(predictions))
-        confidence = float(np.max(predictions))
+        predictions = model.predict(image)[0]  # Get predictions for 1 image
 
-        # Get class name from index
-        class_name = CLASS_NAMES[class_index] if class_index < len(CLASS_NAMES) else "Unknown"
+        # Get top-3 predictions
+        top_3_indices = np.argsort(predictions)[-3:][::-1]  # Get highest confidence classes
+        top_3_results = [
+            {
+                "class_name": CLASS_NAMES[idx] if idx < len(CLASS_NAMES) else "Unknown",
+                "confidence": round(float(predictions[idx] * 100), 2)  # Convert to %
+            }
+            for idx in top_3_indices
+        ]
 
-        # Cleanup memory
-        del image, file_stream
-        gc.collect()
-
-        return jsonify({
-            "class_index": class_index,
-            "class_name": class_name,
-            "confidence": confidence
-        })
+        return jsonify({"top_predictions": top_3_results})
 
     except Exception as e:
-        logging.error(f"Error processing image: {str(e)}")
+        logging.error(f"⚠️ Error processing image: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
