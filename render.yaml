@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: quickdraw-api
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    name: ml-backend
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python app.py"
     envVars:
       - key: PORT
-        value: 5000
+        value: 10000
