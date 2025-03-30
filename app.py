@@ -32,7 +32,7 @@ CLASS_NAMES = [
 ]
 
 # Load the trained model once
-MODEL_PATH = "model.h5"  # Ensure this file is available
+MODEL_PATH = "drawing_model.h5"  # Ensure this file is available
 model = None
 
 def load_model():
