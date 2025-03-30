@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import logging
 import os
+import gc
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -13,14 +14,20 @@ CORS(app)
 # Enable logging
 logging.basicConfig(level=logging.INFO)
 
-# Load model at startup with error handling
 MODEL_PATH = "drawing_model.h5"
-try:
-    model = tf.keras.models.load_model(MODEL_PATH)
-    logging.info("Model loaded successfully.")
-except Exception as e:
-    logging.error(f"Failed to load model: {str(e)}")
-    model = None
+model = None  # Lazy loading (Load only when needed)
+
+def get_model():
+    """Load the model only if it's not already loaded."""
+    global model
+    if model is None:
+        try:
+            model = tf.keras.models.load_model(MODEL_PATH)
+            logging.info("Model loaded successfully.")
+        except Exception as e:
+            logging.error(f"Failed to load model: {str(e)}")
+            model = None
+    return model
 
 @app.route("/")
 def home():
@@ -28,10 +35,12 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    model = get_model()  # Load model only if needed
     if model is None:
         return jsonify({"error": "Model not loaded properly"}), 500
     
     try:
+        # Ensure a file is uploaded
         if "file" not in request.files:
             return jsonify({"error": "No file provided"}), 400
 
@@ -39,7 +48,8 @@ def predict():
         if not file:
             return jsonify({"error": "Empty file"}), 400
 
-        file_stream = np.asarray(bytearray(file), dtype=np.uint8)
+        # Convert file bytes to NumPy array
+        file_stream = np.frombuffer(file, np.uint8)
         image = cv2.imdecode(file_stream, cv2.IMREAD_GRAYSCALE)
 
         if image is None:
@@ -53,6 +63,10 @@ def predict():
         predictions = model.predict(image)
         class_index = int(np.argmax(predictions))
         confidence = float(np.max(predictions))
+
+        # Free memory (helps in low-memory environments)
+        del image, file_stream
+        gc.collect()
 
         return jsonify({"predictions": class_index, "confidence": confidence})
     
