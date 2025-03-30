@@ -1,6 +1,6 @@
-flask
-flask-cors
+Flask
+Flask-Cors
 tensorflow
 numpy
-opencv-python
+opencv-python-headless
 gunicorn
