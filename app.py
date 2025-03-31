@@ -3,29 +3,31 @@ import cv2
 import numpy as np
 import logging
 import tensorflow as tf
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sys
-from werkzeug.utils import secure_filename
 
 # Initialize Flask app
-app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+app = Flask(__name__, static_folder='static')
+CORS(app)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Reduce TensorFlow logging and memory usage
+# Reduce TensorFlow memory usage
 tf.get_logger().setLevel('ERROR')
-tf.config.set_visible_devices([], 'GPU')  # Disable GPU usage
+tf.config.set_visible_devices([], 'GPU')
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as e:
+        logger.error(f"GPU config error: {e}")
 
-# Define class labels
-CLASS_NAMES = [
-    "airplane", "alarm_clock", "ambulance", "apple", "arm", "backpack", "banana", "baseball",
-    # ... (keep the rest of your class names the same)
-    "whale", "zebra"
-]
+# Define class labels (same as before)
+CLASS_NAMES = [...]  # Your class names here
 
 # Model Path
 MODEL_PATH = "drawing_model.h5"
@@ -36,18 +38,17 @@ def load_model():
     if model is None:
         try:
             logger.info("Loading model...")
-            logger.info(f"Current directory contents: {os.listdir()}")
-            
-            if not os.path.exists(MODEL_PATH):
-                logger.error(f"Model file '{MODEL_PATH}' not found!")
-                return None
-                
             model = tf.keras.models.load_model(MODEL_PATH)
             logger.info("Model loaded successfully")
-            return model
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
-            return None
+    return model
+
+# Add favicon route to prevent 404 errors
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                              'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route("/")
 def home():
@@ -99,7 +100,7 @@ def predict():
         logger.error(f"Error processing image: {str(e)}")
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": "Prediction failed. Please try again."
         }), 500
 
 if __name__ == "__main__":
