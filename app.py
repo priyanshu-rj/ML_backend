@@ -3,11 +3,11 @@ import cv2
 import numpy as np
 import logging
 import tensorflow as tf
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 # Initialize Flask app
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__)
 CORS(app)
 
 # Configure logging
@@ -17,37 +17,29 @@ logger = logging.getLogger(__name__)
 # Reduce TensorFlow logging
 tf.get_logger().setLevel('ERROR')
 
-# Define class labels
-CLASS_NAMES = [...]  # Your class names here
+# Define class labels (Replace with your actual class names)
+CLASS_NAMES = ["class1", "class2", "class3", "..."]  # Update this list
 
-# Model Path
-MODEL_PATH = "drawing_model.h5"
+# Model Path (Ensure you have saved the new model as "drawing_model_fixed.h5")
+MODEL_PATH = "drawing_model_fixed.h5"
 model = None
 
 def load_model():
+    """Loads the TensorFlow model, ensuring compatibility with latest versions."""
     global model
     if model is None:
         try:
-            logger.info("Loading model...")
-            
+            logger.info("🔄 Loading model...")
+
             if not os.path.exists(MODEL_PATH):
-                logger.error(f"Model file '{MODEL_PATH}' not found!")
+                logger.error(f"❌ Model file '{MODEL_PATH}' not found!")
                 return None
-                
-            # Try multiple loading methods
-            try:
-                model = tf.keras.models.load_model(MODEL_PATH)
-            except Exception as e:
-                logger.warning(f"Standard load failed, trying alternative: {str(e)}")
-                model = tf.keras.models.load_model(
-                    MODEL_PATH,
-                    compile=False
-                )
-                
-            logger.info("Model loaded successfully")
+
+            model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+            logger.info("✅ Model loaded successfully!")
             return model
         except Exception as e:
-            logger.error(f"Error loading model: {str(e)}")
+            logger.error(f"❌ Error loading model: {str(e)}")
             return None
 
 @app.route("/")
@@ -56,6 +48,7 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    """Handles image prediction requests."""
     model = load_model()
     if model is None:
         return jsonify({"error": "Model could not be loaded!"}), 500
@@ -75,7 +68,7 @@ def predict():
         if image is None:
             return jsonify({"error": "Could not decode image"}), 400
 
-        # Preprocess image
+        # Preprocess image (Ensure correct shape)
         image = cv2.resize(image, (28, 28)) / 255.0
         image = image.reshape(1, 28, 28, 1).astype(np.float32)
 
@@ -97,7 +90,7 @@ def predict():
         })
 
     except Exception as e:
-        logger.error(f"Error processing image: {str(e)}")
+        logger.error(f"❌ Error processing image: {str(e)}")
         return jsonify({
             "success": False,
             "error": "Prediction failed. Please try again."
