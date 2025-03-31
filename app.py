@@ -21,7 +21,7 @@ tf.get_logger().setLevel('ERROR')
 CLASS_NAMES = ["class1", "class2", "class3", "..."]  # Update this list
 
 # Model Path (Ensure you have saved the new model as "drawing_model_fixed.h5")
-MODEL_PATH = "drawing_model_fixed.h5"
+MODEL_PATH = "drawing_model.h5"
 model = None
 
 def load_model():
