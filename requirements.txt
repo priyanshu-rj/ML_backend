@@ -1,6 +1,6 @@
 flask==2.0.3
 flask-cors==3.0.10
-tensorflow-cpu==2.8.0
+tensorflow-cpu==2.15.0  # Or latest available: 2.19.0
 opencv-python-headless==4.5.5.64
 numpy==1.22.4
 gunicorn==20.1.0
