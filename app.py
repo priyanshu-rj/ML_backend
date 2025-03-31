@@ -16,23 +16,14 @@ CORS(app)  # Enable CORS for all routes
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Reduce TensorFlow logging and memory usage
+tf.get_logger().setLevel('ERROR')
+tf.config.set_visible_devices([], 'GPU')  # Disable GPU usage
+
 # Define class labels
 CLASS_NAMES = [
     "airplane", "alarm_clock", "ambulance", "apple", "arm", "backpack", "banana", "baseball",
-    "baseball_bat", "basket", "basketball", "bat", "bed", "bee", "bicycle", "bird", "book",
-    "bottlecap", "bowtie", "brain", "bread", "bridge", "broom", "bus", "butterfly", "cactus",
-    "cake", "calculator", "camera", "candle", "car", "carrot", "castle", "cat", "chair",
-    "clock", "cloud", "coffee_cup", "computer", "cookie", "couch", "cow", "crab", "crown",
-    "cup", "dog", "dolphin", "donut", "door", "dragon", "drums", "duck", "ear", "elephant",
-    "envelope", "eye", "eyeglasses", "face", "fan", "feather", "fire_hydrant", "fish",
-    "flashlight", "flower", "fork", "frog", "frying_pan", "giraffe", "guitar", "hammer",
-    "hand", "hat", "headphones", "helicopter", "horse", "hospital", "hot_air_balloon",
-    "house", "ice_cream", "jail", "kangaroo", "key", "ladder", "laptop", "light_bulb",
-    "lightning", "lion", "lollipop", "map", "monkey", "moon", "mountain", "mouse", "mug",
-    "octopus", "paintbrush", "palm_tree", "panda", "parrot", "pencil", "penguin", "pizza",
-    "police_car", "rabbit", "rainbow", "rhinoceros", "roller_coaster", "sandwich", "school_bus",
-    "scissors", "shark", "sheep", "skateboard", "snail", "snake", "snowman", "soccer_ball",
-    "star", "strawberry", "sun", "swan", "tiger", "train", "tree", "umbrella", "violin",
+    # ... (keep the rest of your class names the same)
     "whale", "zebra"
 ]
 
@@ -69,7 +60,6 @@ def predict():
         return jsonify({"error": "Model could not be loaded!"}), 500
 
     try:
-        # Check if file was uploaded
         if "file" not in request.files:
             return jsonify({"error": "No file provided"}), 400
 
@@ -77,26 +67,19 @@ def predict():
         if file.filename == '':
             return jsonify({"error": "No selected file"}), 400
 
-        logger.info(f"Received file: {file.filename}, {file.mimetype}")
-
-        # Read image file
+        # Read and process image
         file_bytes = np.frombuffer(file.read(), np.uint8)
         image = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
-
+        
         if image is None:
             return jsonify({"error": "Could not decode image"}), 400
-
-        # Debug: Save received image
-        debug_img_path = "received_image.png"
-        cv2.imwrite(debug_img_path, image)
-        logger.info(f"Saved received image to {debug_img_path}")
 
         # Preprocess image
         image = cv2.resize(image, (28, 28)) / 255.0
         image = image.reshape(1, 28, 28, 1).astype(np.float32)
 
         # Make prediction
-        predictions = model.predict(image)[0]
+        predictions = model.predict(image, verbose=0)[0]
         top_3_indices = np.argsort(predictions)[-3:][::-1]
         
         top_3_results = [
