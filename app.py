@@ -5,7 +5,6 @@ import logging
 import tensorflow as tf
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import sys
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static')
@@ -15,18 +14,10 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Reduce TensorFlow memory usage
+# Reduce TensorFlow logging
 tf.get_logger().setLevel('ERROR')
-tf.config.set_visible_devices([], 'GPU')
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        logger.error(f"GPU config error: {e}")
 
-# Define class labels (same as before)
+# Define class labels
 CLASS_NAMES = [...]  # Your class names here
 
 # Model Path
@@ -38,17 +29,26 @@ def load_model():
     if model is None:
         try:
             logger.info("Loading model...")
-            model = tf.keras.models.load_model(MODEL_PATH)
+            
+            if not os.path.exists(MODEL_PATH):
+                logger.error(f"Model file '{MODEL_PATH}' not found!")
+                return None
+                
+            # Try multiple loading methods
+            try:
+                model = tf.keras.models.load_model(MODEL_PATH)
+            except Exception as e:
+                logger.warning(f"Standard load failed, trying alternative: {str(e)}")
+                model = tf.keras.models.load_model(
+                    MODEL_PATH,
+                    compile=False
+                )
+                
             logger.info("Model loaded successfully")
+            return model
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
-    return model
-
-# Add favicon route to prevent 404 errors
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'),
-                              'favicon.ico', mimetype='image/vnd.microsoft.icon')
+            return None
 
 @app.route("/")
 def home():
